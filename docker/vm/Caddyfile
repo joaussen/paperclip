@@ -1,0 +1,13 @@
+# Reverse proxy with automatic TLS in front of the Paperclip server.
+#
+# CADDY_TLS_MODE controls certificate issuance:
+#   - "internal"           self-signed cert; works with any hostname (including
+#                          <ip>.sslip.io) but browsers show a trust warning
+#   - "you@example.com"    publicly trusted ACME cert (Let's Encrypt/ZeroSSL);
+#                          requires PAPERCLIP_DOMAIN to be a real DNS name that
+#                          points at this machine
+{$PAPERCLIP_DOMAIN} {
+	encode zstd gzip
+	tls {$CADDY_TLS_MODE}
+	reverse_proxy server:3100
+}

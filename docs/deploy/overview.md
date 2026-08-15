@@ -40,7 +40,7 @@ Paperclip supports three deployment configurations, from zero-friction local to 
 
 - **Just trying Paperclip?** Use `local_trusted` (the default)
 - **Sharing with a team on private network?** Use `authenticated` + `private`
-- **Deploying to the cloud?** Use `authenticated` + `public` — see [AWS ECS Fargate guide](aws-ecs.md)
+- **Deploying to the cloud?** Use `authenticated` + `public` — see the [AWS EC2 budget guide](aws-ec2.md) (~$33/mo, single VM) or the [AWS ECS Fargate guide](aws-ecs.md) (~$110/mo, managed)
 
 Set the mode during onboarding:
 

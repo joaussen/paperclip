@@ -1,0 +1,88 @@
+# Production single-VM stack: Caddy (HTTPS) -> Paperclip server -> Postgres 17.
+# Designed for one small cloud VM (EC2, Lightsail, Azure VM, Hetzner, ...) that
+# runs 24/7. See docs/deploy/aws-ec2.md for the full guide.
+#
+# Copy paperclip.env.example to .env in this directory and fill it in, then:
+#
+#   docker compose pull
+#   docker compose up -d
+#
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PAPERCLIP_DOMAIN: "${PAPERCLIP_DOMAIN:?PAPERCLIP_DOMAIN must be set (hostname users will visit)}"
+      # "internal" = self-signed cert (no domain needed, browser warning), or an
+      # email address = publicly trusted ACME cert (requires a real DNS name).
+      CADDY_TLS_MODE: "${CADDY_TLS_MODE:-internal}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - server
+
+  server:
+    # `latest` tracks stable releases; pin a version tag (e.g. :2026.802.0) for
+    # fully reproducible deploys, or use :canary for master builds.
+    image: "${PAPERCLIP_IMAGE:-ghcr.io/paperclipai/paperclip:latest}"
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://paperclip:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/paperclip"
+      PORT: "3100"
+      SERVE_UI: "true"
+      PAPERCLIP_HOME: "/paperclip"
+      PAPERCLIP_DEPLOYMENT_MODE: "authenticated"
+      PAPERCLIP_DEPLOYMENT_EXPOSURE: "public"
+      PAPERCLIP_PUBLIC_URL: "https://${PAPERCLIP_DOMAIN}"
+      PAPERCLIP_MIGRATION_AUTO_APPLY: "true"
+      HEARTBEAT_SCHEDULER_ENABLED: "true"
+
+      # ── Required secrets (generate with: openssl rand -hex 32) ──
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}"
+      PAPERCLIP_TOOL_ACTION_SIGNING_SECRET: "${PAPERCLIP_TOOL_ACTION_SIGNING_SECRET:?PAPERCLIP_TOOL_ACTION_SIGNING_SECRET must be set}"
+
+      # ── Lock down sign-up after the first (admin) user registers ──
+      PAPERCLIP_AUTH_DISABLE_SIGN_UP: "${PAPERCLIP_AUTH_DISABLE_SIGN_UP:-false}"
+
+      # ── LLM provider keys (at least one is needed for agents to work) ──
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+    volumes:
+      - paperclip-data:/paperclip
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3100/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paperclip
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
+      POSTGRES_DB: paperclip
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperclip -d paperclip"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  caddy-data:
+  caddy-config:
+  pgdata:
+  paperclip-data:

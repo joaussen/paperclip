@@ -87,7 +87,9 @@
               "deploy/database",
               "deploy/secrets",
               "deploy/storage",
-              "deploy/environment-variables"
+              "deploy/environment-variables",
+              "deploy/aws-ec2",
+              "deploy/aws-ecs"
             ]
           }
         ]
