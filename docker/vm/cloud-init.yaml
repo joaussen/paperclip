@@ -2,8 +2,9 @@
 # First-boot provisioning for a Paperclip VM (Ubuntu 22.04/24.04).
 #
 # This is a template: the __*_B64__ placeholders are replaced with
-# base64-encoded file contents by scripts/aws/deploy-ec2.sh before being passed
-# as instance user data. To use it by hand, replace them yourself:
+# base64-encoded file contents by scripts/aws/deploy-ec2.sh and
+# scripts/azure/deploy-vm.sh before being passed as instance user/custom data.
+# To use it by hand, replace them yourself:
 #
 #   base64 -w0 docker/vm/docker-compose.yml   # -> __DOCKER_COMPOSE_B64__
 #   base64 -w0 docker/vm/Caddyfile            # -> __CADDYFILE_B64__

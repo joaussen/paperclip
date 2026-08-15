@@ -218,4 +218,4 @@ Ways to pay less:
 - **1-year no-upfront reservation / savings plan** on the instance: t4g.medium drops to ~$15.40/mo → **~$24/mo total**. Worth it the moment you know it's staying up 24/7.
 - **t4g.small** (2 GiB + the 2 GiB swap the cloud-init sets up): ~$21/mo total. Fine for evaluation or a single light-use agent team; upgrade with the resize steps above when it gets tight.
 
-The `docker/vm/` stack is cloud-agnostic — the same compose file, Caddyfile, and cloud-init template work on any Ubuntu VM (Azure `B2s` ~$35/mo, Hetzner, GCP `e2-medium`, ...); only the provisioning commands differ.
+The `docker/vm/` stack is cloud-agnostic — the same compose file, Caddyfile, and cloud-init template work on any Ubuntu VM; only the provisioning commands differ. See the [Azure VM guide](azure-vm.md) for the Azure twin of this setup (~$36-44/mo, `scripts/azure/deploy-vm.sh`).

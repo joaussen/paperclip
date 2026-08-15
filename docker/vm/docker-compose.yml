@@ -1,6 +1,6 @@
 # Production single-VM stack: Caddy (HTTPS) -> Paperclip server -> Postgres 17.
-# Designed for one small cloud VM (EC2, Lightsail, Azure VM, Hetzner, ...) that
-# runs 24/7. See docs/deploy/aws-ec2.md for the full guide.
+# Designed for one small cloud VM (EC2, Azure VM, Hetzner, ...) that runs
+# 24/7. See docs/deploy/aws-ec2.md and docs/deploy/azure-vm.md for the guides.
 #
 # Copy paperclip.env.example to .env in this directory and fill it in, then:
 #

@@ -89,7 +89,8 @@
               "deploy/storage",
               "deploy/environment-variables",
               "deploy/aws-ec2",
-              "deploy/aws-ecs"
+              "deploy/aws-ecs",
+              "deploy/azure-vm"
             ]
           }
         ]
