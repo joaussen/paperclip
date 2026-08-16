@@ -153,6 +153,10 @@ Use the invite flow to grant access to additional users afterwards. Also conside
 - Ubuntu's `unattended-upgrades` handles OS security patches automatically
 - Secrets live in `/opt/paperclip/.env` (mode 600). Anything passed through cloud-init custom data is also readable from the instance metadata service by root on the VM itself; rotate secrets in `.env` if that bothers you (`docker compose up -d` applies changes)
 
+## Cheaper Model Providers (Kimi, DeepSeek)
+
+The Claude Code adapter honors `ANTHROPIC_BASE_URL`, so agents can run against any Anthropic-compatible API instead of Anthropic — at a fraction of the token price. In `/opt/paperclip/.env`, set the provider's API key as `ANTHROPIC_API_KEY` plus one of the blocks documented in `docker/vm/paperclip.env.example` (Kimi K2 via `https://api.moonshot.ai/anthropic`, DeepSeek via `https://api.deepseek.com/anthropic`, with `ANTHROPIC_MODEL` pinned accordingly), then `docker compose up -d`. The override is instance-wide: every Claude-adapter agent on the instance uses that endpoint. OpenAI-compatible-only providers can't use this path — wire those through the OpenCode adapter's custom provider config instead.
+
 ## Deploying Updates
 
 ```bash

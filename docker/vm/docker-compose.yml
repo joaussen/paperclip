@@ -58,6 +58,15 @@ services:
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+
+      # ── Anthropic-compatible endpoint override (optional) ──
+      # Point the Claude Code adapter at a cheaper Anthropic-compatible API
+      # (Kimi: https://api.moonshot.ai/anthropic, DeepSeek:
+      # https://api.deepseek.com/anthropic). See paperclip.env.example.
+      ANTHROPIC_BASE_URL: "${ANTHROPIC_BASE_URL:-}"
+      ANTHROPIC_AUTH_TOKEN: "${ANTHROPIC_AUTH_TOKEN:-}"
+      ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-}"
+      ANTHROPIC_SMALL_FAST_MODEL: "${ANTHROPIC_SMALL_FAST_MODEL:-}"
     volumes:
       - paperclip-data:/paperclip
     depends_on:
