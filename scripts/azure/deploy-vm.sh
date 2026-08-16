@@ -178,7 +178,7 @@ if [[ "$MANAGED_DB" == true ]]; then
   fi
   # Ensure the application database exists (ARM PUT — safe if it already does).
   az postgres flexible-server db create --resource-group "$RESOURCE_GROUP" \
-    --server-name "$DB_SERVER" --database-name paperclip --output none
+    --server-name "$DB_SERVER" --name paperclip --output none
   DB_FQDN=$(az postgres flexible-server show --resource-group "$RESOURCE_GROUP" \
     --name "$DB_SERVER" --query fullyQualifiedDomainName --output tsv)
   DB_LINES="COMPOSE_PROFILES=
