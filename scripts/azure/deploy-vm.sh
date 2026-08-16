@@ -173,7 +173,7 @@ if [[ "$MANAGED_DB" == true ]]; then
     az postgres flexible-server update --resource-group "$RESOURCE_GROUP" \
       --name "$DB_SERVER" --admin-password "$DB_PASSWORD" --output none
     az postgres flexible-server firewall-rule create --resource-group "$RESOURCE_GROUP" \
-      --name "$DB_SERVER" --rule-name allow-paperclip-vm \
+      --server-name "$DB_SERVER" --name allow-paperclip-vm \
       --start-ip-address "$PUBLIC_IP" --end-ip-address "$PUBLIC_IP" --output none
   fi
   # Ensure the application database exists (ARM PUT — safe if it already does).
