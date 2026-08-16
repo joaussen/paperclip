@@ -69,7 +69,8 @@ command -v openssl >/dev/null || { echo "openssl not found" >&2; exit 1; }
 "${AWS[@]}" sts get-caller-identity >/dev/null || { echo "aws CLI is not authenticated" >&2; exit 1; }
 
 b64() { base64 <"$1" | tr -d '\n'; }
-b64_str() { printf '%s' "$1" | base64 | tr -d '\n'; }
+# Trailing newline matters: the value becomes a file that later gets appended to.
+b64_str() { printf '%s\n' "$1" | base64 | tr -d '\n'; }
 
 echo "==> Deploying '$NAME' ($INSTANCE_TYPE, ${VOLUME_SIZE_GB} GiB gp3) in $REGION"
 

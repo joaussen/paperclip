@@ -84,7 +84,8 @@ command -v openssl >/dev/null || { echo "openssl not found" >&2; exit 1; }
 az account show >/dev/null || { echo "az CLI is not logged in (run: az login)" >&2; exit 1; }
 
 b64() { base64 <"$1" | tr -d '\n'; }
-b64_str() { printf '%s' "$1" | base64 | tr -d '\n'; }
+# Trailing newline matters: the value becomes a file that later gets appended to.
+b64_str() { printf '%s\n' "$1" | base64 | tr -d '\n'; }
 
 DB_MODE_LABEL="postgres container on the VM"
 [[ "$MANAGED_DB" == true ]] && DB_MODE_LABEL="managed Flexible Server ($DB_SKU)"
