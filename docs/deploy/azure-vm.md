@@ -40,7 +40,7 @@ Useful flags: `--vm-size` (default `Standard_B2s`), `--disk-size` (default 64 Gi
   --domain paperclip.example.com --acme-email you@example.com
 ```
 
-For ~$19/mo extra you get automated backups with 7-day point-in-time restore, patching, and storage autogrow — the database is the one piece of this stack where managed genuinely reduces risk. The script creates the server with public access restricted to the VM's static IP only, wires `DATABASE_URL` (with `sslmode=require`) into the server env, and disables the bundled Postgres container via compose profiles. Re-runs reuse the existing server (resetting its admin password to a fresh one). Provisioning adds ~5 minutes.
+For ~$19/mo extra you get automated backups with 7-day point-in-time restore, patching, and storage autogrow — the database is the one piece of this stack where managed genuinely reduces risk. The script creates the server with public access restricted to the VM's static IP only, allow-lists the Postgres extensions the migrations need (`azure.extensions = PG_TRGM,FUZZYSTRMATCH` — Azure rejects `CREATE EXTENSION` otherwise), wires `DATABASE_URL` (with `sslmode=require`) into the server env, and disables the bundled Postgres container via compose profiles. Re-runs reuse the existing server (resetting its admin password to a fresh one). Provisioning adds ~5 minutes.
 
 Point your DNS **A record** at the printed public IP right after the script finishes — Caddy obtains the Let's Encrypt certificate automatically once the name resolves.
 
@@ -128,6 +128,14 @@ sudo cat /var/log/cloud-init-output.log   # if something didn't come up
 - All three services `running`, server healthcheck `healthy`
 - Server logs show `plugin job coordinator started` and `plugin-loader: loadAll complete`
 - `/api/health` returns 200
+
+**If `az vm create` is rejected before anything deploys** (often with an unhelpful CLI traceback): your subscription may simply not offer the chosen size in that region — common for `Standard_B2s` on sponsorship/partner-credit subscriptions. List what you can use and pick an equivalent (the `_v2` B-series are drop-in and often cheaper):
+
+```bash
+az vm list-skus --location westeurope --size Standard_B2 \
+  --query "[].{name:name, restricted:length(restrictions)>\`0\`}" -o table
+# then re-run with e.g. --vm-size Standard_B2als_v2
+```
 
 ## Post-Deploy Security Hardening
 

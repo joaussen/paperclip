@@ -176,6 +176,11 @@ if [[ "$MANAGED_DB" == true ]]; then
       --server-name "$DB_SERVER" --name allow-paperclip-vm \
       --start-ip-address "$PUBLIC_IP" --end-ip-address "$PUBLIC_IP" --output none
   fi
+  # Azure blocks CREATE EXTENSION until the extension is allow-listed on the
+  # server; the Paperclip migrations use pg_trgm and fuzzystrmatch.
+  az postgres flexible-server parameter set --resource-group "$RESOURCE_GROUP" \
+    --server-name "$DB_SERVER" --name azure.extensions \
+    --value PG_TRGM,FUZZYSTRMATCH --output none
   # Ensure the application database exists (ARM PUT — safe if it already does).
   az postgres flexible-server db create --resource-group "$RESOURCE_GROUP" \
     --server-name "$DB_SERVER" --name paperclip --output none
