@@ -33,6 +33,15 @@ The script provisions a dedicated resource group (`paperclip` — teardown is de
 
 Useful flags: `--vm-size` (default `Standard_B2s`), `--disk-size` (default 64 GiB), `--name`, `--resource-group`, `--ssh-cidr`. Run with `--help` for all options. Omit `--domain` to use the sslip.io fallback.
 
+**Recommended upgrade — managed database.** Add `--managed-db` to run Postgres on [Azure Database for PostgreSQL Flexible Server](https://learn.microsoft.com/azure/postgresql/flexible-server/) (`Standard_B1ms`, 32 GiB, Postgres 17) instead of a container on the VM:
+
+```bash
+./scripts/azure/deploy-vm.sh --location westeurope --managed-db \
+  --domain paperclip.example.com --acme-email you@example.com
+```
+
+For ~$19/mo extra you get automated backups with 7-day point-in-time restore, patching, and storage autogrow — the database is the one piece of this stack where managed genuinely reduces risk. The script creates the server with public access restricted to the VM's static IP only, wires `DATABASE_URL` (with `sslmode=require`) into the server env, and disables the bundled Postgres container via compose profiles. Re-runs reuse the existing server (resetting its admin password to a fresh one). Provisioning adds ~5 minutes.
+
 Point your DNS **A record** at the printed public IP right after the script finishes — Caddy obtains the Let's Encrypt certificate automatically once the name resolves.
 
 ## Option B: Manual Walkthrough
@@ -147,7 +156,9 @@ cd /opt/paperclip && sudo docker compose pull && sudo docker compose up -d
 
 ## Backups
 
-Nightly Postgres dumps with 7-day rotation, kept on the VM:
+**Managed-db deployments (`--managed-db`):** Flexible Server handles this — automated backups with 7-day point-in-time restore are on by default (extendable to 35 days). Nothing to set up for the database; only agent workspaces/uploads remain on the VM disk (snapshot it occasionally, see below).
+
+**Local-db deployments:** nightly Postgres dumps with 7-day rotation, kept on the VM:
 
 ```bash
 ssh azureuser@$PUBLIC_IP
@@ -175,7 +186,7 @@ az vm resize --resource-group paperclip --name paperclip --size Standard_B2ms
 
 ## Teardown
 
-Everything lives in the dedicated resource group:
+Everything lives in the dedicated resource group (including the Flexible Server if you used `--managed-db` — its backups are deleted with it, so take a final `pg_dump` first if the data matters):
 
 ```bash
 az group delete --name paperclip --yes
@@ -192,6 +203,15 @@ Pay-as-you-go, West Europe (East US in parentheses), August 2026 pricing:
 | Public IPv4 | Standard, static | ~$3.65 |
 | Data transfer | first 100 GB/mo out | $0 |
 | **Total** | | **~$43.50/mo (~$39/mo)** |
+
+With `--managed-db`, add Azure Database for PostgreSQL Flexible Server:
+
+| Item | Config | Monthly |
+|------|--------|---------|
+| Flexible Server | Standard_B1ms, 1 vCPU / 2 GiB | ~$14.55 |
+| DB storage | 32 GiB | ~$4.40 |
+| Backups | 7-day PITR within provisioned storage | $0 |
+| **Total with managed db** | | **~$62/mo West Europe** |
 
 Ways to pay less:
 

@@ -33,7 +33,11 @@ services:
     image: "${PAPERCLIP_IMAGE:-ghcr.io/paperclipai/paperclip:latest}"
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgres://paperclip:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/paperclip"
+      # Defaults to the bundled `db` container. For a managed database (Azure
+      # Flexible Server, RDS, ...), set DATABASE_URL in .env — usually with
+      # ?sslmode=require — and set COMPOSE_PROFILES= (empty) so the bundled
+      # Postgres does not start.
+      DATABASE_URL: "${DATABASE_URL:-postgres://paperclip:${POSTGRES_PASSWORD:-}@db:5432/paperclip}"
       PORT: "3100"
       SERVE_UI: "true"
       PAPERCLIP_HOME: "/paperclip"
@@ -59,6 +63,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+        # Tolerate the db service being disabled (managed-database mode).
+        required: false
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3100/api/health || exit 1"]
       interval: 30s
@@ -67,11 +73,16 @@ services:
       start_period: 60s
 
   db:
+    # Only started when the local-db profile is active (COMPOSE_PROFILES in
+    # .env). Leave the profile off when DATABASE_URL points at a managed
+    # database.
+    profiles: ["local-db"]
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: paperclip
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
+      # Required in local-db mode (generate with: openssl rand -hex 32)
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-}"
       POSTGRES_DB: paperclip
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U paperclip -d paperclip"]

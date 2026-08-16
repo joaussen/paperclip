@@ -179,6 +179,8 @@ Restore: `gunzip -c backups/paperclip-N.sql.gz | sudo docker compose exec -T db 
 
 For off-instance backups, snapshot the EBS volume (`aws ec2 create-snapshot`) or schedule it with Amazon Data Lifecycle Manager; agent workspaces and uploads live in the `paperclip-data` volume on the same disk.
 
+Alternatively, move the database to managed Postgres (e.g. RDS `db.t4g.micro`, ~$15/mo extra) for automated backups and point-in-time restore: set `DATABASE_URL=postgres://...?sslmode=require` and `COMPOSE_PROFILES=` (empty) in `/opt/paperclip/.env`, then `docker compose up -d` — the bundled Postgres container stays off. The [Azure guide](azure-vm.md) automates this pattern with its `--managed-db` flag.
+
 ## Resizing
 
 If agents feel CPU/RAM constrained (e.g. many concurrent local agents), move up a size (`t4g.large` = 2 vCPU / 8 GiB, ~2x the instance cost). The Elastic IP and data survive:

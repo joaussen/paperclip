@@ -25,6 +25,9 @@ ADMIN_USER="azureuser"
 DOMAIN=""
 ACME_EMAIL=""
 SSH_CIDR=""
+MANAGED_DB=false
+DB_SKU="Standard_B1ms" # 1 vCPU / 2 GiB burstable
+DB_STORAGE_GB=32
 
 usage() {
   sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
@@ -42,6 +45,11 @@ Options:
   --acme-email EMAIL     ACME contact for Let's Encrypt when --domain is set
                          (default: admin@DOMAIN)
   --ssh-cidr CIDR        CIDR allowed to SSH (default: your current IP /32)
+  --managed-db           Use Azure Database for PostgreSQL Flexible Server
+                         (managed backups/PITR, patching) instead of the
+                         Postgres container on the VM. Adds ~\$19/mo.
+  --db-sku SKU           Flexible Server compute (default: Standard_B1ms)
+  --db-storage-gb GB     Flexible Server storage (default: 32)
   -h, --help             Show this help
 
 Environment passthrough into the server (all optional at deploy time):
@@ -59,6 +67,9 @@ while [[ $# -gt 0 ]]; do
     --domain) DOMAIN="$2"; shift 2 ;;
     --acme-email) ACME_EMAIL="$2"; shift 2 ;;
     --ssh-cidr) SSH_CIDR="$2"; shift 2 ;;
+    --managed-db) MANAGED_DB=true; shift ;;
+    --db-sku) DB_SKU="$2"; shift 2 ;;
+    --db-storage-gb) DB_STORAGE_GB="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -75,7 +86,9 @@ az account show >/dev/null || { echo "az CLI is not logged in (run: az login)" >
 b64() { base64 <"$1" | tr -d '\n'; }
 b64_str() { printf '%s' "$1" | base64 | tr -d '\n'; }
 
-echo "==> Deploying '$NAME' ($VM_SIZE, ${DISK_SIZE_GB} GiB Standard SSD) in $LOCATION (resource group: $RESOURCE_GROUP)"
+DB_MODE_LABEL="postgres container on the VM"
+[[ "$MANAGED_DB" == true ]] && DB_MODE_LABEL="managed Flexible Server ($DB_SKU)"
+echo "==> Deploying '$NAME' ($VM_SIZE, ${DISK_SIZE_GB} GiB Standard SSD, db: ${DB_MODE_LABEL}) in $LOCATION (resource group: $RESOURCE_GROUP)"
 
 # ── Image: Ubuntu 24.04 LTS, arch derived from the VM size ──────────────────
 # Azure ARM (Cobalt/Ampere) sizes carry a 'p' after the family digits, e.g.
@@ -131,6 +144,46 @@ else
   echo "==> No --domain given: using ${DOMAIN} with a self-signed certificate"
 fi
 
+# ── Managed database (optional): Azure Database for PostgreSQL Flexible ─────
+DB_LINES="COMPOSE_PROFILES=local-db"
+DB_SERVER=""
+if [[ "$MANAGED_DB" == true ]]; then
+  # Flexible Server password policy needs 3+ character classes; the prefix
+  # keeps the hex tail compliant while staying URL-safe.
+  DB_PASSWORD="Pp1!$(openssl rand -hex 24)"
+  DB_SERVER=$(az postgres flexible-server list --resource-group "$RESOURCE_GROUP" \
+    --query "[?starts_with(name, '${NAME}-db')].name | [0]" --output tsv)
+  if [[ -z "$DB_SERVER" ]]; then
+    DB_SERVER="${NAME}-db-$(openssl rand -hex 3)"
+    echo "==> Creating managed Postgres $DB_SERVER ($DB_SKU, ${DB_STORAGE_GB} GiB) — takes ~5 min..."
+    az postgres flexible-server create \
+      --resource-group "$RESOURCE_GROUP" \
+      --name "$DB_SERVER" \
+      --location "$LOCATION" \
+      --tier Burstable \
+      --sku-name "$DB_SKU" \
+      --storage-size "$DB_STORAGE_GB" \
+      --version 17 \
+      --admin-user paperclip \
+      --admin-password "$DB_PASSWORD" \
+      --database-name paperclip \
+      --public-access "$PUBLIC_IP" \
+      --yes --output none
+  else
+    echo "==> Reusing managed Postgres $DB_SERVER (resetting admin password)"
+    az postgres flexible-server update --resource-group "$RESOURCE_GROUP" \
+      --name "$DB_SERVER" --admin-password "$DB_PASSWORD" --output none
+    az postgres flexible-server firewall-rule create --resource-group "$RESOURCE_GROUP" \
+      --name "$DB_SERVER" --rule-name allow-paperclip-vm \
+      --start-ip-address "$PUBLIC_IP" --end-ip-address "$PUBLIC_IP" --output none
+  fi
+  DB_FQDN=$(az postgres flexible-server show --resource-group "$RESOURCE_GROUP" \
+    --name "$DB_SERVER" --query fullyQualifiedDomainName --output tsv)
+  DB_LINES="COMPOSE_PROFILES=
+DATABASE_URL=postgres://paperclip:${DB_PASSWORD}@${DB_FQDN}:5432/paperclip?sslmode=require"
+  echo "==> Managed Postgres ready at $DB_FQDN (firewall: VM IP only)"
+fi
+
 # ── Secrets and server .env ──────────────────────────────────────────────────
 POSTGRES_PASSWORD=$(openssl rand -hex 32)
 BETTER_AUTH_SECRET=$(openssl rand -hex 32)
@@ -140,6 +193,7 @@ ENV_CONTENT=$(cat <<EOF
 PAPERCLIP_DOMAIN=${DOMAIN}
 CADDY_TLS_MODE=${CADDY_TLS_MODE}
 PAPERCLIP_IMAGE=ghcr.io/paperclipai/paperclip:latest
+${DB_LINES}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
 PAPERCLIP_TOOL_ACTION_SIGNING_SECRET=${TOOL_SIGNING_SECRET}
@@ -183,6 +237,7 @@ Paperclip deployment ($(date -u +%Y-%m-%dT%H:%M:%SZ))
   Public IP:      ${PUBLIC_IP}
   VM:             ${NAME} (${VM_SIZE}, ${LOCATION})
   Resource group: ${RESOURCE_GROUP}
+  Database:       ${DB_SERVER:-postgres container on the VM}
   SSH:            ssh ${ADMIN_USER}@${PUBLIC_IP}
   Server env:     /opt/paperclip/.env on the VM (secrets live there)
   Teardown:       az group delete --name ${RESOURCE_GROUP}
